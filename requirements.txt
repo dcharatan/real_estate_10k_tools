@@ -1,0 +1,12 @@
+torch
+torchvision
+tqdm
+pytorch_lightning
+black
+ruff
+hydra-core
+jaxtyping
+beartype
+wandb
+einops
+colorama

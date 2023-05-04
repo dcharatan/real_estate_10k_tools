@@ -1,0 +1,27 @@
+defaults:
+  - dataset: placeholder
+  - model: placeholder
+
+wandb:
+  project: boilerplate
+  entity: scene-representation-group
+  name: placeholder
+  mode: offline
+
+train:
+  num_workers: 4
+  batch_size: 64
+  optim:
+    lr: 4e-3
+  checkpointing:
+    every_n_train_steps: 4192
+    save_top_k: -1
+
+test:
+  num_workers: 4
+  batch_size: 64
+
+val:
+  num_workers: 4
+  batch_size: 1
+  interval: 256
