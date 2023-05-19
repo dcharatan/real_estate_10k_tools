@@ -32,7 +32,7 @@ def save_image(
     channel, _, _ = image.shape
     if channel == 1:
         image = repeat(image, "() h w -> c h w", c=3)
-    assert channel in (3, 4)
+    assert image.shape[0] in (3, 4)
 
     # Create the parent directory if it doesn't already exist.
     path = Path(path)
