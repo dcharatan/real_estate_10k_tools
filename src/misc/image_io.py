@@ -26,7 +26,7 @@ def save_image(
 
     # Handle single-channel images.
     if image.ndim == 2:
-        image = rearrange("h w -> () h w")
+        image = rearrange(image, "h w -> () h w")
 
     # Ensure that there are 3 or 4 channels.
     channel, _, _ = image.shape
