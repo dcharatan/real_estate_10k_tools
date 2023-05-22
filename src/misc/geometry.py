@@ -32,8 +32,16 @@ def transform_cam2world(
     homogeneous_camera_xyz: Float[Tensor, "*#batch 4"],
     cam2world: Float[Tensor, "*#batch 4 4"],
 ) -> Float[Tensor, "*batch 4"]:
-    """Transform points from 3D world coordinates to 3D camera coordinates."""
+    """Transform points from 3D camera coordinates to 3D world coordinates."""
     return transform_rigid(homogeneous_camera_xyz, cam2world)
+
+
+def transform_world2cam(
+    homogeneous_camera_xyz: Float[Tensor, "*#batch 4"],
+    cam2world: Float[Tensor, "*#batch 4 4"],
+) -> Float[Tensor, "*batch 4"]:
+    """Transform points from 3D world coordinates to 3D camera coordinates."""
+    return transform_rigid(homogeneous_camera_xyz, cam2world.inverse())
 
 
 def project(
