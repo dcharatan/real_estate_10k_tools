@@ -1,6 +1,6 @@
 from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 
 from .DatasetPlaceholder import DatasetPlaceholder
 from .ValidationWrapper import ValidationWrapper
@@ -18,10 +18,11 @@ class DataModule(LightningDataModule):
         self.cfg = cfg
 
     def train_dataloader(self):
+        dataset = DATASETS[self.cfg.dataset.name](self.cfg.dataset, "train")
         return DataLoader(
-            DATASETS[self.cfg.dataset.name](self.cfg.dataset, "train"),
+            dataset,
             self.cfg.train.batch_size,
-            shuffle=True,
+            shuffle=not isinstance(dataset, IterableDataset),
             num_workers=self.cfg.train.num_workers,
         )
 
