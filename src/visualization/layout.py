@@ -108,7 +108,7 @@ def overlay(
 def cat(
     images: List[Float[Tensor, "channel _ _"]],
     main_axis: Axis,
-    alignment: Alignment,
+    alignment: Alignment = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ) -> Float[Tensor, "channel height width"]:
@@ -147,7 +147,7 @@ def cat(
 
 def hcat(
     images: List[Float[Tensor, "channel _ _"]],
-    alignment: Literal["start", "center", "end", "top", "bottom"],
+    alignment: Literal["start", "center", "end", "top", "bottom"] = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ):
@@ -169,7 +169,7 @@ def hcat(
 
 def vcat(
     images: List[Float[Tensor, "channel _ _"]],
-    alignment: Literal["start", "center", "end", "left", "right"],
+    alignment: Literal["start", "center", "end", "left", "right"] = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ):
@@ -194,7 +194,7 @@ def add_border(
     border: int,
     border_color: Color = 1,
 ) -> Float[Tensor, "channel new_height new_width"]:
-    border_color = _sanitize_color(border_color).to(image.device)
+    border_color = _sanitize_color(border_color).to(image)
     c, h, w = image.shape
     result = torch.empty(
         (c, h + 2 * border, w + 2 * border), dtype=torch.float32, device=image.device
