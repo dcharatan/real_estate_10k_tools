@@ -62,13 +62,13 @@ def _get_cross_dim(main_axis: Axis) -> int:
     }[main_axis]
 
 
-def _compute_offset(base: int, overlay: int, alignment: Alignment) -> slice:
+def _compute_offset(base: int, overlay: int, align: Alignment) -> slice:
     assert base >= overlay
     offset = {
         "start": 0,
         "center": (base - overlay) // 2,
         "end": base - overlay,
-    }[alignment]
+    }[align]
     return slice(offset, offset + overlay)
 
 
@@ -108,7 +108,7 @@ def overlay(
 def cat(
     images: List[Float[Tensor, "channel _ _"]],
     main_axis: Axis,
-    alignment: Alignment = "center",
+    align: Alignment = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ) -> Float[Tensor, "channel height width"]:
@@ -128,7 +128,7 @@ def cat(
         padded_shape[cross_dim] = cross_axis_length
         base = torch.ones(padded_shape, dtype=torch.float32, device=device)
         base = base * gap_color[:, None, None]
-        padded_images.append(overlay(base, image, main_axis, "start", alignment))
+        padded_images.append(overlay(base, image, main_axis, "start", align))
 
     # Intersperse separators if necessary.
     if gap > 0:
@@ -147,7 +147,7 @@ def cat(
 
 def hcat(
     images: List[Float[Tensor, "channel _ _"]],
-    alignment: Literal["start", "center", "end", "top", "bottom"] = "center",
+    align: Literal["start", "center", "end", "top", "bottom"] = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ):
@@ -161,7 +161,7 @@ def hcat(
             "end": "end",
             "top": "start",
             "bottom": "end",
-        }[alignment],
+        }[align],
         gap=gap,
         gap_color=gap_color,
     )
@@ -169,7 +169,7 @@ def hcat(
 
 def vcat(
     images: List[Float[Tensor, "channel _ _"]],
-    alignment: Literal["start", "center", "end", "left", "right"] = "center",
+    align: Literal["start", "center", "end", "left", "right"] = "center",
     gap: int = 0,
     gap_color: Color = 1,
 ):
@@ -183,7 +183,7 @@ def vcat(
             "end": "end",
             "left": "start",
             "right": "end",
-        }[alignment],
+        }[align],
         gap=gap,
         gap_color=gap_color,
     )
