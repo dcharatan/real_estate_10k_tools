@@ -11,7 +11,6 @@ Images are assumed to be float32 tensors with shape (channel, height, width).
 from typing import Any, Generator, Iterable, List, Literal, Union
 
 import torch
-from einops import rearrange
 from jaxtyping import Float
 from torch import Tensor
 
@@ -137,8 +136,8 @@ def cat(
         c, _, _ = images[0].shape
         separator_size = [gap, gap]
         separator_size[cross_dim - 1] = cross_axis_length
-        separator = torch.ones((*separator_size, c), dtype=torch.float32, device=device)
-        separator = rearrange(separator * gap_color, "h w c -> c h w")
+        separator = torch.ones((c, *separator_size), dtype=torch.float32, device=device)
+        separator = separator * gap_color[:, None, None]
 
         # Intersperse the separator between the images.
         padded_images = list(_intersperse(padded_images, separator))
@@ -195,7 +194,7 @@ def add_border(
     border: int,
     border_color: Color = 1,
 ) -> Float[Tensor, "channel new_height new_width"]:
-    border_color = _sanitize_color(border_color).to(device)
+    border_color = _sanitize_color(border_color).to(image.device)
     c, h, w = image.shape
     result = torch.empty(
         (c, h + 2 * border, w + 2 * border), dtype=torch.float32, device=image.device
