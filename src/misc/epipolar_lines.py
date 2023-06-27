@@ -1,5 +1,5 @@
 import itertools
-from typing import Iterable, Literal, TypedDict
+from typing import Iterable, Literal, Tuple, TypedDict
 
 import torch
 from einops import einsum, rearrange, repeat
@@ -7,7 +7,7 @@ from jaxtyping import Bool, Float
 from torch import Tensor
 from torch.utils.data.dataloader import default_collate
 
-from .geometry import homogenize_points, homogenize_vecs, project
+from .geometry import homogenize_points, homogenize_vectors, project
 
 
 def _is_in_bounds(
@@ -29,19 +29,19 @@ def _is_in_front_of_camera(
 
 
 class PointProjection(TypedDict):
-    t: Float[Tensor, "camera ray"]  # ray parameter, as in xyz = origin + t * direction
-    xy: Float[Tensor, "camera ray 2"]  # image-space xy (normalized to 0 to 1)
+    t: Float[Tensor, "batch ray"]  # ray parameter, as in xyz = origin + t * direction
+    xy: Float[Tensor, "batch ray 2"]  # image-space xy (normalized to 0 to 1)
 
     # A "valid" projection satisfies two conditions:
     # 1. It is in front of the camera (i.e., its 3D Z coordinate is positive).
     # 2. It is within the image frame (i.e., its 2D coordinates are between 0 and 1).
-    valid: Bool[Tensor, "camera ray"]
+    valid: Bool[Tensor, "batch ray"]
 
 
 def _intersect_image_coordinate(
-    intrinsics: Float[Tensor, "camera 3 3"],
-    origins: Float[Tensor, "camera ray 3"],
-    directions: Float[Tensor, "camera ray 3"],
+    intrinsics: Float[Tensor, "batch 3 3"],
+    origins: Float[Tensor, "batch ray 3"],
+    directions: Float[Tensor, "batch ray 3"],
     dimension: Literal["x", "y"],
     coordinate_value: float,
 ) -> PointProjection:
@@ -52,7 +52,7 @@ def _intersect_image_coordinate(
     # Define shorthands.
     dim = "xy".index(dimension)
     other_dim = 1 - dim
-    intrinsics = rearrange(intrinsics, "camera i j -> camera () i j")
+    intrinsics = rearrange(intrinsics, "b i j -> b () i j")
     fs = intrinsics[..., dim, dim]  # focal length, same coordinate
     fo = intrinsics[..., other_dim, other_dim]  # focal length, other coordinate
     cs = intrinsics[..., dim, 2]  # principal point, same coordinate
@@ -117,9 +117,9 @@ def _compare_projections(
 
 
 def _compute_point_projection(
-    xyz: Float[Tensor, "camera ray 3"],
-    t: Float[Tensor, "camera ray"],
-    intrinsics: Float[Tensor, "camera 3 3"],
+    xyz: Float[Tensor, "batch ray 3"],
+    t: Float[Tensor, "batch ray"],
+    intrinsics: Float[Tensor, "batch 3 3"],
 ) -> PointProjection:
     xy = project(xyz, intrinsics)
     return {
@@ -130,28 +130,28 @@ def _compute_point_projection(
 
 
 class RaySegmentProjection(TypedDict):
-    t_min: Float[Tensor, "camera ray"]  # ray parameter
-    t_max: Float[Tensor, "camera ray"]  # ray parameter
-    xy_min: Float[Tensor, "camera ray 2"]  # image-space xy (normalized to 0 to 1)
-    xy_min: Float[Tensor, "camera ray 2"]  # image-space xy (normalized to 0 to 1)
+    t_min: Float[Tensor, "batch ray"]  # ray parameter
+    t_max: Float[Tensor, "batch ray"]  # ray parameter
+    xy_min: Float[Tensor, "batch ray 2"]  # image-space xy (normalized to 0 to 1)
+    xy_min: Float[Tensor, "batch ray 2"]  # image-space xy (normalized to 0 to 1)
 
     # Whether the segment overlaps the image. If not, the above values are meaningless.
-    overlaps_image: Bool[Tensor, "camera ray"]
+    overlaps_image: Bool[Tensor, "batch ray"]
 
 
 def project_rays(
-    origins: Float[Tensor, "camera ray 3"],
-    directions: Float[Tensor, "camera ray 3"],
-    extrinsics: Float[Tensor, "camera 4 4"],
-    intrinsics: Float[Tensor, "camera 3 3"],
+    origins: Float[Tensor, "batch ray 3"],
+    directions: Float[Tensor, "batch ray 3"],
+    extrinsics: Float[Tensor, "batch 4 4"],
+    intrinsics: Float[Tensor, "batch 3 3"],
     epsilon: float = 1e-6,
 ) -> RaySegmentProjection:
     # Transform the rays into camera space.
     world_to_cam = torch.linalg.inv(extrinsics)
     origins = homogenize_points(origins)
-    origins = einsum(world_to_cam, origins, "c i j, c r j -> c r i")
-    directions = homogenize_vecs(directions)
-    directions = einsum(world_to_cam, directions, "c i j, c r j -> c r i")
+    origins = einsum(world_to_cam, origins, "b i j, b r j -> b r i")
+    directions = homogenize_vectors(directions)
+    directions = einsum(world_to_cam, directions, "b i j, b r j -> b r i")
     origins = origins[..., :3]
     directions = directions[..., :3]
 
@@ -214,3 +214,69 @@ def project_rays(
         result["overlaps_image"][mask] = (min_value["valid"] & max_value["valid"])[mask]
 
     return result
+
+
+class RaySegmentProjection(TypedDict):
+    t_min: Float[Tensor, "batch ray"]  # ray parameter
+    t_max: Float[Tensor, "batch ray"]  # ray parameter
+    xy_min: Float[Tensor, "batch ray 2"]  # image-space xy (normalized to 0 to 1)
+    xy_max: Float[Tensor, "batch ray 2"]  # image-space xy (normalized to 0 to 1)
+
+    # Whether the segment overlaps the image. If not, the above values are meaningless.
+    overlaps_image: Bool[Tensor, "batch ray"]
+
+
+def unnormalize_projection(
+    projection: RaySegmentProjection,
+    shape: Tuple[int, int],
+) -> RaySegmentProjection:
+    h, w = shape
+    device = projection["xy_min"].device
+    multiplier = torch.tensor((w, h), dtype=torch.float32, device=device)
+    return {
+        "t_min": projection["t_min"].clone(),
+        "t_max": projection["t_max"].clone(),
+        "xy_min": projection["xy_min"] * multiplier,
+        "xy_max": projection["xy_max"] * multiplier,
+        "overlaps_image": projection["overlaps_image"].clone(),
+    }
+
+
+def dot(
+    x: Float[Tensor, "*#batch dim"],
+    y: Float[Tensor, "*#batch dim"],
+) -> Float[Tensor, "*batch 1"]:
+    return (x * y).sum(dim=-1, keepdim=True)
+
+
+def get_distance_to_projection(
+    projection: RaySegmentProjection,
+    samples: Float[Tensor, "batch sample xy"],
+) -> Float[Tensor, "batch ray sample"]:
+    """Note: To avoid distortion from non-square normalized images, use the
+    unnormalize_projection function before using this one.
+    """
+
+    xy_min = rearrange(projection["xy_min"], "b r xy -> b r () xy")
+    xy_max = rearrange(projection["xy_max"], "b r xy -> b r () xy")
+    valid = rearrange(projection["overlaps_image"], "b r -> b r ()")
+    samples = rearrange(samples, "b s xy -> b () s xy")
+
+    # Decompose the samples into parallel and perpendicular components.
+    ab = xy_max - xy_min
+    ac = samples - xy_min
+    ab_norm = ab.norm(dim=-1, keepdim=True)
+    para_scalar = dot(ab, ac) / (ab_norm + 1e-9)
+    para = ab / (ab_norm + 1e-9) * para_scalar
+    perp = ac - para
+
+    # Compute endpoint distances.
+    near_distance = (para + perp).norm(dim=-1)
+    far_distance = (ab - para + perp).norm(dim=-1)
+    use_endpoints = ((para_scalar < 0) | (para_scalar > ab_norm))[..., 0]
+
+    # Compute masked distances for the middle (line part) and endpoints.
+    middle = (valid & ~use_endpoints) * perp.norm(dim=-1)
+    endpoints = (valid & use_endpoints) * torch.minimum(near_distance, far_distance)
+    invalid = (~valid * torch.inf).nan_to_num(0)
+    return middle + endpoints + invalid
