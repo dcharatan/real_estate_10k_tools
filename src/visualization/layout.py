@@ -109,7 +109,7 @@ def cat(
     images: List[Float[Tensor, "channel _ _"]],
     main_axis: Axis,
     align: Alignment = "center",
-    gap: int = 0,
+    gap: int = 8,
     gap_color: Color = 1,
 ) -> Float[Tensor, "channel height width"]:
     """Arrange images in a line. The interface resembles a CSS div with flexbox."""
@@ -148,7 +148,7 @@ def cat(
 def hcat(
     images: List[Float[Tensor, "channel _ _"]],
     align: Literal["start", "center", "end", "top", "bottom"] = "center",
-    gap: int = 0,
+    gap: int = 8,
     gap_color: Color = 1,
 ):
     """Shorthand for a horizontal linear concatenation."""
@@ -170,7 +170,7 @@ def hcat(
 def vcat(
     images: List[Float[Tensor, "channel _ _"]],
     align: Literal["start", "center", "end", "left", "right"] = "center",
-    gap: int = 0,
+    gap: int = 8,
     gap_color: Color = 1,
 ):
     """Shorthand for a horizontal linear concatenation."""
@@ -191,7 +191,7 @@ def vcat(
 
 def add_border(
     image: Float[Tensor, "channel height width"],
-    border: int,
+    border: int = 8,
     border_color: Color = 1,
 ) -> Float[Tensor, "channel new_height new_width"]:
     border_color = _sanitize_color(border_color).to(image)
