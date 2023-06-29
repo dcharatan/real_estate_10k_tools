@@ -10,3 +10,4 @@ beartype
 wandb
 einops
 colorama
+scikit-image
