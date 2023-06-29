@@ -17,6 +17,7 @@ with install_import_hook(
     ("beartype", "beartype"),
 ):
     from src.dataset.DataModule import DataModule
+    from src.misc.wandb_tools import download_latest_checkpoint
     from src.model.ModelWrapper import ModelWrapper
 
 
@@ -67,6 +68,20 @@ def train(cfg: DictConfig):
             )
         )
 
+    # Prepare the checkpoint for loading.
+    checkpoint = cfg.get("checkpoint", None)
+    if checkpoint is None:
+        checkpoint_path = None
+    elif str(checkpoint).startswith("wandb://"):
+        run_id = checkpoint[len("wandb://") :]
+        project = cfg.wandb.project
+        checkpoint_path = download_latest_checkpoint(
+            f"{project}/{run_id}",
+            Path("checkpoints"),
+        )
+    else:
+        checkpoint_path = Path(checkpoint)
+
     trainer = Trainer(
         max_epochs=-1,
         accelerator="gpu",
@@ -79,6 +94,7 @@ def train(cfg: DictConfig):
     trainer.fit(
         ModelWrapper(cfg),
         datamodule=DataModule(cfg),
+        ckpt_path=checkpoint_path,
     )
 
 
