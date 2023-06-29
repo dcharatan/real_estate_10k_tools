@@ -8,7 +8,7 @@ def compute_psnr(
     predicted: Float[Tensor, "*batch channel"],
 ) -> float:
     return peak_signal_noise_ratio(
-        ground_truth.detach().cpu().numpy(),
-        predicted.detach().cpu().numpy(),
+        ground_truth.clip(min=0, max=1).detach().cpu().numpy(),
+        predicted.clip(min=0, max=1).detach().cpu().numpy(),
         data_range=1.0,
     )
