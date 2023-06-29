@@ -162,3 +162,4 @@ cython_debug/
 # Outputs
 /outputs
 /lightning_logs
+/checkpoints
