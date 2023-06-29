@@ -17,6 +17,7 @@ with install_import_hook(
     ("beartype", "beartype"),
 ):
     from src.dataset.DataModule import DataModule
+    from src.misc.LocalLogger import LocalLogger
     from src.misc.wandb_tools import download_latest_checkpoint
     from src.model.ModelWrapper import ModelWrapper
 
@@ -57,7 +58,7 @@ def train(cfg: DictConfig):
         if wandb.run is not None:
             wandb.run.log_code(".")
     else:
-        logger = None
+        logger = LocalLogger()
 
     # Set up checkpointing.
     if "checkpointing" in cfg.train:
