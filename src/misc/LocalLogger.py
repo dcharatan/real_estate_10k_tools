@@ -35,7 +35,7 @@ class LocalLogger(Logger):
         # The function signature is the same as the wandb logger's, but the step is
         # actually required.
         assert step is not None
-        LOG_PATH.mkdir(exist_ok=True, parents=True)
-        key = key.replace("/", "_")
         for index, image in enumerate(images):
-            Image.fromarray(image).save(LOG_PATH / f"{key}_{index:0>2}_{step:0>6}.png")
+            path = LOG_PATH / f"{key}/{index:0>2}_{step:0>6}.png"
+            path.parent.mkdir(exist_ok=True, parents=True)
+            Image.fromarray(image).save(path)
