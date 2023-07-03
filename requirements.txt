@@ -11,3 +11,5 @@ wandb
 einops
 colorama
 scikit-image
+colorspacious
+matplotlib
