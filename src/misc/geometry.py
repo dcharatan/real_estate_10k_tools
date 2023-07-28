@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import torch
-from einops import einsum, rearrange, repeat
+from einops import einsum
 from jaxtyping import Float, Int64
 from torch import Tensor
 
@@ -45,26 +45,26 @@ def transform_world2cam(
 
 
 def project(
-    points: Float[Tensor, "batch point 3"],
-    intrinsics: Float[Tensor, "batch 3 3"],
+    points: Float[Tensor, "*#batch 3"],
+    intrinsics: Float[Tensor, "*#batch 3 3"],
     epsilon: float = torch.finfo(torch.float32).eps,
-) -> Float[Tensor, "batch point 2"]:
+) -> Float[Tensor, "*batch 2"]:
     points = points / (points[..., -1:] + epsilon)
-    points = einsum(intrinsics, points, "b i j, b p j -> b p i")
+    points = einsum(intrinsics, points, "... i j, ... j -> ... i")
     return points[..., :2]
 
 
 def unproject(
-    coordinates_xy: Float[Tensor, "batch ray 2"],
-    z: Float[Tensor, "batch ray"],
-    intrinsics: Float[Tensor, "batch 3 3"],
-) -> Float[Tensor, "batch ray 3"]:
+    coordinates_xy: Float[Tensor, "*#batch 2"],
+    z: Float[Tensor, "*#batch"],
+    intrinsics: Float[Tensor, "*#batch 3 3"],
+) -> Float[Tensor, "*batch 3"]:
     """Unproject 2D camera coordinates with the given Z values."""
 
     # Apply the inverse intrinsics to the coordinates.
     coordinates_xy = homogenize_points(coordinates_xy)
     coordinates_xyz = einsum(
-        intrinsics.inverse(), coordinates_xy, "b i j, b r j -> b r i"
+        intrinsics.inverse(), coordinates_xy, "... i j, ... j -> ... i"
     )
 
     # Apply the supplied depth values.
@@ -72,16 +72,13 @@ def unproject(
 
 
 def get_world_rays(
-    coordinates_xy: Float[Tensor, "batch ray 2"],
-    extrinsics: Float[Tensor, "batch 4 4"],
-    intrinsics: Float[Tensor, "batch 3 3"],
+    coordinates_xy: Float[Tensor, "*#batch 2"],
+    extrinsics: Float[Tensor, "*#batch 4 4"],
+    intrinsics: Float[Tensor, "*#batch 3 3"],
 ) -> Tuple[
-    Float[Tensor, "batch ray 3"],  # origins
-    Float[Tensor, "batch ray 3"],  # directions
+    Float[Tensor, "*batch 3"],  # origins
+    Float[Tensor, "*batch 3"],  # directions
 ]:
-    # Extract ray origins.
-    origins = extrinsics[..., :3, 3]
-
     # Get camera-space ray directions.
     directions = unproject(
         coordinates_xy,
@@ -92,16 +89,12 @@ def get_world_rays(
 
     # Transform ray directions to world coordinates.
     directions = homogenize_vectors(directions)
-    directions = transform_cam2world(
-        directions,
-        rearrange(extrinsics, "b h w -> b () h w"),
-    )
+    directions = transform_cam2world(directions, extrinsics)[..., :3]
 
     # Tile the ray origins to have the same shape as the ray directions.
-    _, num_rays, _ = directions.shape
-    origins = repeat(origins, "b xyz -> b r xyz", r=num_rays)
+    origins = extrinsics[..., :3, 3].broadcast_to(directions.shape)
 
-    return origins, directions[..., :3]
+    return origins, directions
 
 
 def sample_image_grid(
