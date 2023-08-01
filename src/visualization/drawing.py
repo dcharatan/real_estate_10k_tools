@@ -1,6 +1,8 @@
+from typing import Tuple
+
 import torch
-from einops import rearrange, reduce, repeat
-from jaxtyping import Float
+from einops import einsum, rearrange, reduce, repeat
+from jaxtyping import Bool, Float
 from torch import Tensor
 
 
@@ -41,3 +43,53 @@ def draw_markers(
     marked_image = image.detach().clone()
     marked_image[mask] = color[mask]
     return marked_image
+
+
+def _generate_line_mask(
+    shape: Tuple[int, int],
+    start: Float[Tensor, "line 2"],
+    end: Float[Tensor, "line 2"],
+    width: float,
+) -> Bool[Tensor, "height width"]:
+    device = start.device
+
+    # Generate a pixel grid.
+    h, w = shape
+    x = torch.arange(w, device=device) + 0.5
+    y = torch.arange(h, device=device) + 0.5
+    xy = torch.stack(torch.meshgrid(x, y, indexing="xy"), dim=-1)
+
+    # Define a vector between the start and end points.
+    delta = end - start
+    delta_norm = delta.norm(dim=-1, keepdim=True)
+    u_delta = delta / delta_norm
+
+    # Define a vector between each pixel and the start point.
+    indicator = xy - start[:, None, None]
+
+    # Determine whether each pixel is inside the line in the parallel direction.
+    parallel = einsum(u_delta, indicator, "l xy, l h w xy -> l h w")
+    parallel_inside_line = (parallel <= delta_norm[..., None]) & (parallel > 0)
+
+    # Determine whether each pixel is inside the line in the perpendicular direction.
+    perpendicular = indicator - parallel[..., None] * u_delta[:, None, None]
+    perpendicular_inside_line = perpendicular.norm(dim=-1) < (0.5 * width)
+
+    return (parallel_inside_line & perpendicular_inside_line).any(dim=0)
+
+
+def draw_lines(
+    image: Float[Tensor, "3 height width"],
+    start: Float[Tensor, "line 2"],
+    end: Float[Tensor, "line 2"],
+    color: Float[Tensor, "3"],
+    width: float = 4.0,
+    supersample: int = 5,
+) -> Float[Tensor, "3 height width"]:
+    _, h, w = image.shape
+    s = supersample
+    mask = _generate_line_mask((h * s, w * s), start * s, end * s, width * s)
+    mask = reduce(mask.float(), "(h hs) (w ws) -> h w", "mean", hs=s, ws=s)
+
+    # Paint the line on the image.
+    return image * (1 - mask[None]) + color[:, None, None] * mask[None]
