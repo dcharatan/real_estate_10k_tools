@@ -192,13 +192,13 @@ def vcat(
 def add_border(
     image: Float[Tensor, "channel height width"],
     border: int = 8,
-    border_color: Color = 1,
+    color: Color = 1,
 ) -> Float[Tensor, "channel new_height new_width"]:
-    border_color = _sanitize_color(border_color).to(image)
+    color = _sanitize_color(color).to(image)
     c, h, w = image.shape
     result = torch.empty(
         (c, h + 2 * border, w + 2 * border), dtype=torch.float32, device=image.device
     )
-    result[:] = border_color[:, None, None]
+    result[:] = color[:, None, None]
     result[:, border : h + border, border : w + border] = image
     return result
