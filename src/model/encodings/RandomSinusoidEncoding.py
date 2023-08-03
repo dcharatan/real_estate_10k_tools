@@ -1,8 +1,24 @@
+from math import log
+
 import torch
 import torch.nn as nn
 from einops import einsum
 from jaxtyping import Float
 from torch import Tensor
+
+
+def inverse_cdf(
+    x: Float[Tensor, " *batch"],
+    min_frequency: float,
+    max_frequency: float,
+) -> Float[Tensor, " *batch"]:
+    """This transforms a uniform frequency distribution between 0 and 1 to resemble a
+    positional encoding's frequency distribution. See the interactive version:
+    https://www.desmos.com/calculator/wids3vx9lj
+    """
+    a = log(min_frequency)
+    b = log(max_frequency)
+    return torch.exp(x * (b - a) + a)
 
 
 class RandomSinusoidEncoding(nn.Module):
@@ -14,13 +30,19 @@ class RandomSinusoidEncoding(nn.Module):
         dimensionality: int,
         num_frequencies: int,
         largest_period: float,
+        num_octaves: int,
     ):
         super().__init__()
 
-        # Pick uniformly distributed random frequencies.
-        frequencies = torch.rand((num_frequencies, dimensionality), dtype=torch.float32)
-        frequencies = 2 * torch.pi * frequencies / largest_period
-        self.register_buffer("frequencies", frequencies, persistent=False)
+        # Pick appropriately distributed random frequencies.
+        min_frequency = 2 * torch.pi / largest_period
+        max_frequency = min_frequency * 2**num_octaves
+        samples = torch.rand(num_frequencies, dtype=torch.float32)
+        samples = inverse_cdf(samples, min_frequency, max_frequency)
+        sample_dirs = torch.randn((num_frequencies, dimensionality))
+        sample_dirs = sample_dirs / sample_dirs.norm(dim=-1, keepdim=True)
+        samples = sample_dirs * samples[..., None]
+        self.register_buffer("frequencies", samples, persistent=False)
 
         # Pick uniformly distributed random phases.
         phases = torch.rand(num_frequencies, dtype=torch.float32) * 2 * torch.pi
