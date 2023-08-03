@@ -42,11 +42,11 @@ class RandomSinusoidEncoding(nn.Module):
         sample_dirs = torch.randn((num_frequencies, dimensionality))
         sample_dirs = sample_dirs / sample_dirs.norm(dim=-1, keepdim=True)
         samples = sample_dirs * samples[..., None]
-        self.register_buffer("frequencies", samples, persistent=False)
+        self.register_buffer("frequencies", samples, persistent=True)
 
         # Pick uniformly distributed random phases.
         phases = torch.rand(num_frequencies, dtype=torch.float32) * 2 * torch.pi
-        self.register_buffer("phases", phases, persistent=False)
+        self.register_buffer("phases", phases, persistent=True)
 
     def forward(
         self,
