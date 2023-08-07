@@ -12,6 +12,7 @@ LOG_PATH = Path("outputs/local")
 class LocalLogger(Logger):
     def __init__(self) -> None:
         super().__init__()
+        self.experiment = None
         os.system(f"rm -r {LOG_PATH}")
 
     @property

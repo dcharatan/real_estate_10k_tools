@@ -7,6 +7,7 @@ from einops import rearrange, repeat
 from jaxtyping import Float, UInt8
 from PIL import Image
 from torch import Tensor
+import torchvision.transforms as tf
 
 FloatImage = Union[
     Float[Tensor, "height width"],
@@ -46,3 +47,9 @@ def save_image(
 
     # Save the image.
     Image.fromarray(prep_image(image)).save(path)
+
+
+def load_image(
+    path: Union[Path, str],
+) -> Float[Tensor, "3 height width"]:
+    return tf.ToTensor()(Image.open(path))[:3]
