@@ -135,16 +135,13 @@ def sample_training_rays(
 
     # Generate all possible target rays.
     xy, _ = sample_image_grid(h, w, device)
-    xy = repeat(xy, "h w xy -> (b v) (h w) xy", b=b, v=v)
     origins, directions = get_world_rays(
         xy,
-        rearrange(extrinsics, "b v i j -> (b v) i j"),
-        rearrange(intrinsics, "b v i j -> (b v) i j"),
+        rearrange(extrinsics, "b v i j -> b v () () i j"),
+        rearrange(intrinsics, "b v i j -> b v () () i j"),
     )
-    origins = rearrange(origins, "(b v) (h w) xy -> b (v h w) xy", b=b, v=v, h=h, w=w)
-    directions = rearrange(
-        directions, "(b v) (h w) xy -> b (v h w) xy", b=b, v=v, h=h, w=w
-    )
+    origins = rearrange(origins, "b v h w xy -> b (v h w) xy", b=b, v=v, h=h, w=w)
+    directions = rearrange(directions, "b v h w xy -> b (v h w) xy", b=b, v=v, h=h, w=w)
     pixels = rearrange(image, "b v c h w -> b (v h w) c")
 
     # Sample random rays.
