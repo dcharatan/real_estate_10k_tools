@@ -1,19 +1,37 @@
+import io
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 import torch
+import torchvision.transforms as tf
 from einops import rearrange, repeat
 from jaxtyping import Float, UInt8
+from matplotlib.figure import Figure
 from PIL import Image
 from torch import Tensor
-import torchvision.transforms as tf
 
 FloatImage = Union[
     Float[Tensor, "height width"],
     Float[Tensor, "channel height width"],
     Float[Tensor, "batch channel height width"],
 ]
+
+
+def fig_to_image(
+    fig: Figure,
+    dpi: int = 100,
+    device: torch.device = torch.device("cpu"),
+) -> Float[Tensor, "3 height width"]:
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="raw", dpi=dpi)
+    buffer.seek(0)
+    data = np.frombuffer(buffer.getvalue(), dtype=np.uint8)
+    h = int(fig.bbox.bounds[3])
+    w = int(fig.bbox.bounds[2])
+    data = rearrange(data, "(h w c) -> c h w", h=h, w=w, c=4)
+    buffer.close()
+    return (torch.tensor(data, device=device, dtype=torch.float32) / 255)[:3]
 
 
 def prep_image(image: FloatImage) -> UInt8[np.ndarray, "height width channel"]:
