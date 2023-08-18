@@ -1,4 +1,5 @@
 from pathlib import Path
+from string import ascii_letters, digits, punctuation
 
 import numpy as np
 import torch
@@ -9,21 +10,7 @@ from torch import Tensor
 
 from .layout import vcat
 
-
-def crop_whitespace(
-    image: Float[Tensor, "3 height width"],
-) -> Float[Tensor, "3 cropped_height cropped_width"]:
-    content_pixels = (image != 1).all(dim=0)
-
-    content_rows = content_pixels.any(dim=1)
-    from_row = torch.where(content_rows)[0].min()
-    to_row = torch.where(content_rows)[0].max() + 1
-
-    content_cols = content_pixels.any(dim=0)
-    from_col = torch.where(content_cols)[0].min()
-    to_col = torch.where(content_cols)[0].max() + 1
-
-    return image[:, from_row:to_row, from_col:to_col]
+EXPECTED_CHARACTERS = digits + punctuation + ascii_letters
 
 
 def draw_label(
@@ -34,12 +21,13 @@ def draw_label(
 ) -> Float[Tensor, "3 height width"]:
     """Draw a black label on a white background with no border."""
     font = ImageFont.truetype(str(font), font_size)
-    width, height = font.getsize(text)
+    width, _ = font.getsize(text)
+    _, height = font.getsize(EXPECTED_CHARACTERS)
     image = Image.new("RGB", (width, height), color="white")
     draw = ImageDraw.Draw(image)
     draw.text((0, 0), text, font=font, fill="black")
     image = torch.tensor(np.array(image) / 255, dtype=torch.float32, device=device)
-    return crop_whitespace(rearrange(image, "h w c -> c h w"))
+    return rearrange(image, "h w c -> c h w")
 
 
 def add_label(
@@ -48,4 +36,9 @@ def add_label(
     font: Path = Path("assets/Inter-Regular.otf"),
     font_size: int = 24,
 ) -> Float[Tensor, "3 width_with_label height_with_label"]:
-    return vcat(draw_label(label, font, font_size, image.device), image, align="left")
+    return vcat(
+        draw_label(label, font, font_size, image.device),
+        image,
+        align="left",
+        gap=4,
+    )
