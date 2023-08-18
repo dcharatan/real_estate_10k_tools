@@ -8,7 +8,7 @@
 Images are assumed to be float32 tensors with shape (channel, height, width).
 """
 
-from typing import Any, Generator, Iterable, List, Literal, Union
+from typing import Any, Generator, Iterable, Literal, Union
 
 import torch
 from jaxtyping import Float
@@ -106,8 +106,8 @@ def overlay(
 
 
 def cat(
-    images: List[Float[Tensor, "channel _ _"]],
     main_axis: Axis,
+    *images: Iterable[Float[Tensor, "channel _ _"]],
     align: Alignment = "center",
     gap: int = 8,
     gap_color: Color = 1,
@@ -146,16 +146,16 @@ def cat(
 
 
 def hcat(
-    images: List[Float[Tensor, "channel _ _"]],
+    *images: Iterable[Float[Tensor, "channel _ _"]],
     align: Literal["start", "center", "end", "top", "bottom"] = "center",
     gap: int = 8,
     gap_color: Color = 1,
 ):
     """Shorthand for a horizontal linear concatenation."""
     return cat(
-        images,
         "horizontal",
-        {
+        *images,
+        align={
             "start": "start",
             "center": "center",
             "end": "end",
@@ -168,16 +168,16 @@ def hcat(
 
 
 def vcat(
-    images: List[Float[Tensor, "channel _ _"]],
+    *images: Iterable[Float[Tensor, "channel _ _"]],
     align: Literal["start", "center", "end", "left", "right"] = "center",
     gap: int = 8,
     gap_color: Color = 1,
 ):
     """Shorthand for a horizontal linear concatenation."""
     return cat(
-        images,
         "vertical",
-        {
+        *images,
+        align={
             "start": "start",
             "center": "center",
             "end": "end",
