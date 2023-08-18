@@ -6,9 +6,9 @@ from .types import Stage
 
 
 class DatasetPlaceholder(Dataset):
-    def __init__(self, cfg_dataset: DictConfig, stage: Stage) -> None:
+    def __init__(self, cfg: DictConfig, stage: Stage) -> None:
         super().__init__()
-        self.cfg_dataset = cfg_dataset
+        self.cfg = cfg
 
     def __getitem__(self, index: int):
         return torch.zeros((64, 64), dtype=torch.float32)
