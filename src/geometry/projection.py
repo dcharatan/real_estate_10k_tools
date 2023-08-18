@@ -1,7 +1,7 @@
 from typing import Tuple
 
 import torch
-from einops import einsum, rearrange, reduce, repeat
+from einops import einsum, rearrange, repeat
 from jaxtyping import Float, Int64
 from torch import Tensor
 
@@ -154,47 +154,3 @@ def sample_training_rays(
         directions[batch_indices, ray_indices],
         pixels[batch_indices, ray_indices],
     )
-
-
-def intersect_rays(
-    origins_x: Float[Tensor, "*#batch 3"],
-    directions_x: Float[Tensor, "*#batch 3"],
-    origins_y: Float[Tensor, "*#batch 3"],
-    directions_y: Float[Tensor, "*#batch 3"],
-) -> Float[Tensor, "*batch 3"]:
-    """Compute the least-squares intersection of rays. Uses the math from here:
-    https://math.stackexchange.com/a/1762491/286022
-    """
-
-    # Broadcast the rays so their shapes match.
-    shape = torch.broadcast_shapes(
-        origins_x.shape,
-        directions_x.shape,
-        origins_y.shape,
-        directions_y.shape,
-    )
-    origins_x = origins_x.broadcast_to(shape)
-    directions_x = directions_x.broadcast_to(shape)
-    origins_y = origins_y.broadcast_to(shape)
-    directions_y = directions_y.broadcast_to(shape)
-
-    # Stack the rays into (2, *shape).
-    origins = torch.stack([origins_x, origins_y], dim=0)
-    directions = torch.stack([directions_x, directions_y], dim=0)
-    dtype = origins.dtype
-    device = origins.device
-
-    # Compute n_i * n_i^T - eye(3) from the equation.
-    *batch, _ = shape
-    n = einsum(directions, directions, "r ... i, r ... j -> r ... i j")
-    n = n - torch.eye(3, dtype=dtype, device=device).broadcast_to((2, *batch, 3, 3))
-
-    # Compute the left-hand side of the equation.
-    lhs = reduce(n, "r ... i j -> ... i j", "sum")
-
-    # Compute the right-hand side of the equation.
-    rhs = einsum(n, origins, "r ... i j, r ... j -> r ... i")
-    rhs = reduce(rhs, "r ... i -> ... i", "sum")
-
-    # Left-matrix-multiply both sides by the pseudo-inverse of lhs to find p.
-    return torch.linalg.lstsq(lhs, rhs).solution

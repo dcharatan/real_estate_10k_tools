@@ -7,7 +7,7 @@ from jaxtyping import Bool, Float
 from torch import Tensor
 from torch.utils.data.dataloader import default_collate
 
-from .geometry import homogenize_points, homogenize_vectors, project
+from .projection import homogenize_points, homogenize_vectors, project
 
 
 def _is_in_bounds(
