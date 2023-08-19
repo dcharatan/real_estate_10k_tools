@@ -8,9 +8,10 @@
 Images are assumed to be float32 tensors with shape (channel, height, width).
 """
 
-from typing import Any, Generator, Iterable, Literal, Union
+from typing import Any, Generator, Iterable, Literal, Optional, Tuple, Union
 
 import torch
+import torch.nn.functional as F
 from jaxtyping import Float
 from torch import Tensor
 
@@ -202,3 +203,26 @@ def add_border(
     result[:] = color[:, None, None]
     result[:, border : h + border, border : w + border] = image
     return result
+
+
+def resize(
+    image: Float[Tensor, "channel height width"],
+    shape: Optional[Tuple[int, int]] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+) -> Float[Tensor, "channel new_height new_width"]:
+    assert (shape is not None) + (width is not None) + (height is not None) == 1
+    _, h, w = image.shape
+
+    if width is not None:
+        shape = (int(h * width / w), width)
+    elif height is not None:
+        shape = (height, int(w * height / h))
+
+    return F.interpolate(
+        image[None],
+        shape,
+        mode="bilinear",
+        align_corners=False,
+        antialias="bilinear",
+    )[0]
