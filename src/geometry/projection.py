@@ -1,3 +1,4 @@
+from math import prod
 from typing import Tuple
 
 import torch
@@ -51,7 +52,7 @@ def project(
 ) -> Float[Tensor, "*batch dim-1"]:
     points = points / (points[..., -1:] + epsilon)
     points = einsum(intrinsics, points, "... i j, ... j -> ... i")
-    return points[..., :2]
+    return points[..., :-1]
 
 
 def unproject(
@@ -89,7 +90,7 @@ def get_world_rays(
 
     # Transform ray directions to world coordinates.
     directions = homogenize_vectors(directions)
-    directions = transform_cam2world(directions, extrinsics)[..., :3]
+    directions = transform_cam2world(directions, extrinsics)[..., :-1]
 
     # Tile the ray origins to have the same shape as the ray directions.
     origins = extrinsics[..., :-1, -1].broadcast_to(directions.shape)
@@ -98,54 +99,53 @@ def get_world_rays(
 
 
 def sample_image_grid(
-    height: int,
-    width: int,
+    shape: Tuple[int, ...],
     device: torch.device = torch.device("cpu"),
 ) -> Tuple[
-    Float[Tensor, "height width 2"],  # (x, y) coordinates
-    Int64[Tensor, "height width 2"],  # (row, col) indices
+    Float[Tensor, "*shape dim"],  # float coordinates (xy indexing)
+    Int64[Tensor, "*shape dim"],  # integer indices (ij indexing)
 ]:
-    """Get normalized (range 0 to 1) xy coordinates and row-col indices for an image."""
+    """Get normalized (range 0 to 1) coordinates and integer indices for an image."""
 
-    # Each entry is a pixel-wise (row, col) coordinate.
-    row = torch.arange(height, device=device)
-    col = torch.arange(width, device=device)
-    selector = torch.stack(torch.meshgrid(row, col, indexing="ij"), dim=-1)
+    # Each entry is a pixel-wise integer coordinate. In the 2D case, each entry is a
+    # (row, col) coordinate.
+    indices = [torch.arange(length, device=device) for length in shape]
+    stacked_indices = torch.stack(torch.meshgrid(*indices, indexing="ij"), dim=-1)
 
-    # Each entry is a spatial (x, y) coordinate in the range (0, 1).
-    x = (col + 0.5) / width
-    y = (row + 0.5) / height
-    coordinates = torch.stack(torch.meshgrid(x, y, indexing="xy"), dim=-1)
+    # Each entry is a floating-point coordinate in the range (0, 1). In the 2D case,
+    # each entry is an (x, y) coordinate.
+    coordinates = [(idx + 0.5) / length for idx, length in zip(indices, shape)]
+    coordinates = torch.stack(torch.meshgrid(*coordinates, indexing="xy"), dim=-1)
 
-    return coordinates, selector
+    return coordinates, stacked_indices
 
 
 def sample_training_rays(
-    image: Float[Tensor, "batch view channel height width"],
-    extrinsics: Float[Tensor, "batch view 4 4"],
-    intrinsics: Float[Tensor, "batch view 3 3"],
+    image: Float[Tensor, "batch view channel ..."],
+    intrinsics: Float[Tensor, "batch view dim dim"],
+    extrinsics: Float[Tensor, "batch view dim+1 dim+1"],
     num_rays: int,
 ) -> Tuple[
-    Float[Tensor, "batch ray 3"],  # origins
-    Float[Tensor, "batch ray 3"],  # directions
+    Float[Tensor, "batch ray dim"],  # origins
+    Float[Tensor, "batch ray dim"],  # directions
     Float[Tensor, "batch ray 3"],  # sampled color
 ]:
     device = extrinsics.device
-    b, v, _, h, w = image.shape
+    b, v, _, *grid_shape = image.shape
 
     # Generate all possible target rays.
-    xy, _ = sample_image_grid(h, w, device)
+    xy, _ = sample_image_grid(tuple(grid_shape), device)
     origins, directions = get_world_rays(
-        xy,
-        rearrange(extrinsics, "b v i j -> b v () () i j"),
-        rearrange(intrinsics, "b v i j -> b v () () i j"),
+        rearrange(xy, "... d -> ... () () d"),
+        extrinsics,
+        intrinsics,
     )
-    origins = rearrange(origins, "b v h w xy -> b (v h w) xy", b=b, v=v, h=h, w=w)
-    directions = rearrange(directions, "b v h w xy -> b (v h w) xy", b=b, v=v, h=h, w=w)
-    pixels = rearrange(image, "b v c h w -> b (v h w) c")
+    origins = rearrange(origins, "... b v xy -> b (v ...) xy", b=b, v=v)
+    directions = rearrange(directions, "... b v xy -> b (v ...) xy", b=b, v=v)
+    pixels = rearrange(image, "b v c ... -> b (v ...) c")
 
     # Sample random rays.
-    num_possible_rays = v * h * w
+    num_possible_rays = v * prod(grid_shape)
     ray_indices = torch.randint(num_possible_rays, (b, num_rays), device=device)
     batch_indices = repeat(torch.arange(b, device=device), "b -> b n", n=num_rays)
 
