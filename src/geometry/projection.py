@@ -115,6 +115,7 @@ def sample_image_grid(
     # Each entry is a floating-point coordinate in the range (0, 1). In the 2D case,
     # each entry is an (x, y) coordinate.
     coordinates = [(idx + 0.5) / length for idx, length in zip(indices, shape)]
+    coordinates = reversed(coordinates)
     coordinates = torch.stack(torch.meshgrid(*coordinates, indexing="xy"), dim=-1)
 
     return coordinates, stacked_indices
