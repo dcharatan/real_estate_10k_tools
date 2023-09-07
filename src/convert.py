@@ -116,7 +116,7 @@ if __name__ == "__main__":
             )
             dir = OUTPUT_DIR / stage
             dir.mkdir(exist_ok=True, parents=True)
-            torch.save(dir / f"{chunk_key}.torch")
+            torch.save(chunk, dir / f"{chunk_key}.torch")
 
             # Reset the chunk.
             chunk_size = 0
