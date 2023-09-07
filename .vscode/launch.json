@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Train",
+            "name": "Convert RealEstate10k",
             "type": "python",
             "request": "launch",
-            "module": "src.main",
+            "module": "src.convert",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [],

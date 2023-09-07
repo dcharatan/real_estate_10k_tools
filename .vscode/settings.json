@@ -1,6 +1,4 @@
 {
-    // Automatically format using Black on save.
-    "python.formatting.provider": "black",
     "editor.formatOnSave": true,
     // Draw a ruler at Black's column width.
     "editor.rulers": [
@@ -17,5 +15,8 @@
         "**/__pycache__": true,
         "**/venv": true,
         "**/lightning_logs": true,
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
     },
 }
