@@ -5,13 +5,15 @@ from typing import Literal, TypedDict
 
 import numpy as np
 import torch
+from einops import rearrange
 from jaxtyping import Float, Int, UInt8
 from torch import Tensor
+from torchvision.io import encode_jpeg
 from tqdm import tqdm
 
-INPUT_IMAGE_DIR = Path("/data/scene-rep/Real-Estate-10k")
-INPUT_METADATA_DIR = Path("/data/scene-rep/Real-Estate-10k/metadata/RealEstate10K")
-OUTPUT_DIR = Path("/data/scene-rep/Real-Estate-10k/re10k_pt")
+INPUT_IMAGE_DIR = Path("/mnt/hdd/datasets/acid/ACID/dataset_hi_res")
+INPUT_METADATA_DIR = Path("/mnt/hdd/datasets/acid/ACID/ACID")
+OUTPUT_DIR = Path("/mnt/sn850x/datasets/acid")
 
 # Target 100 MB per chunk.
 TARGET_BYTES_PER_CHUNK = int(1e8)
@@ -56,10 +58,19 @@ def load_raw(path: Path) -> UInt8[Tensor, " length"]:
     return torch.tensor(np.memmap(path, dtype="uint8", mode="r"))
 
 
-def load_images(example_path: Path) -> dict[int, UInt8[Tensor, "..."]]:
+def load_images(
+    example_path: Path,
+    quality: int = 95,
+) -> dict[int, UInt8[Tensor, " _"]]:
     """Load JPG images as raw bytes (do not decode)."""
 
-    return {int(path.stem): load_raw(path) for path in example_path.iterdir()}
+    loaded = np.load(example_path / "data.npz")
+    return {
+        int(Path(file).stem): encode_jpeg(
+            rearrange(torch.tensor(loaded[file]), "h w c -> c h w"), quality
+        )
+        for file in loaded.files
+    }
 
 
 class Metadata(TypedDict):
@@ -98,7 +109,7 @@ def load_metadata(example_path: Path) -> Metadata:
 
 
 if __name__ == "__main__":
-    for stage in ("train", "test"):
+    for stage in ("train", "test", "validation"):
         keys = get_example_keys(stage)
 
         chunk_size = 0
