@@ -137,7 +137,6 @@ if __name__ == "__main__":
         for key in keys:
             image_dir = INPUT_IMAGE_DIR / stage / key
             metadata_dir = INPUT_METADATA_DIR / stage / f"{key}.txt"
-            num_bytes = get_size(image_dir)
 
             # Read images and metadata.
             try:
@@ -160,9 +159,17 @@ if __name__ == "__main__":
             # Add the key to the example.
             example["key"] = key
 
-            print(f"    Added {key} to chunk ({num_bytes / 1e6:.2f} MB).")
+            uncompressed_bytes = get_size(image_dir)
+            compressed_bytes = sum(
+                [sys.getsizeof(image.storage()) for image in example["images"]]
+            )
+
+            print(
+                f"    Added {key} to chunk ({uncompressed_bytes / 1e6:.2f} MB -> "
+                f"{compressed_bytes / 1e6:.2f} MB)."
+            )
             chunk.append(example)
-            chunk_size += num_bytes
+            chunk_size += compressed_bytes
 
             if chunk_size >= TARGET_BYTES_PER_CHUNK:
                 save_chunk()
