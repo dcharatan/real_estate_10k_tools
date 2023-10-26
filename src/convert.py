@@ -144,10 +144,14 @@ if __name__ == "__main__":
             example = load_metadata(metadata_dir)
 
             # Merge the images into the example.
-            example["images"] = [
-                images[timestamp.item()] for timestamp in example["timestamps"]
-            ]
-            assert len(images) == len(example["timestamps"])
+            try:
+                example["images"] = [
+                    images[timestamp.item()] for timestamp in example["timestamps"]
+                ]
+                assert len(images) == len(example["timestamps"])
+            except (KeyError, AssertionError):
+                print(f"Skipped {key}!")
+                continue
 
             # Add the key to the example.
             example["key"] = key
