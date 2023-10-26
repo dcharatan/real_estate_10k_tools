@@ -140,7 +140,11 @@ if __name__ == "__main__":
             num_bytes = get_size(image_dir)
 
             # Read images and metadata.
-            images = load_images(image_dir)
+            try:
+                images = load_images(image_dir)
+            except FileNotFoundError:
+                print(f"Skipped {key}! (no data.npz)")
+                continue
             example = load_metadata(metadata_dir)
 
             # Merge the images into the example.
@@ -150,7 +154,7 @@ if __name__ == "__main__":
                 ]
                 assert len(images) == len(example["timestamps"])
             except (KeyError, AssertionError):
-                print(f"Skipped {key}!")
+                print(f"Skipped {key}! (missing image in data.npz)")
                 continue
 
             # Add the key to the example.
